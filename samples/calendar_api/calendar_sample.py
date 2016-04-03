@@ -32,11 +32,14 @@ def main(argv):
 
     try:
         page_token = None
+        print("List of calenders in this account")
+
         while True:
             calendar_list = service.calendarList().list(
                 pageToken=page_token).execute()
             for calendar_list_entry in calendar_list['items']:
-                print(calendar_list_entry['summary'])
+                print(calendar_list_entry['summary'],"----")
+            print("===============")
             page_token = calendar_list.get('nextPageToken')
             if not page_token:
                 break
