@@ -17,14 +17,29 @@
 
 __author__ = 'e.bidelman (Eric Bidelman)'
 
-import getopt
 import mimetypes
 import os.path
-import sys
+import pprint
 
 import gdata.sample_util
 import gdata.sites.client
 import gdata.sites.data
+import html
+from bs4 import BeautifulSoup
+
+from string import Template
+
+
+import sys
+import os.path
+sys.path.insert(0, "./samples")
+
+from samples.sites_api.googleTemplates import *
+from samples.sites_api.googleTemplates import param0
+import googleTemplates
+
+import re
+
 
 
 SOURCE_APP_NAME = 'googleInc-GoogleSitesAPIPythonLibSample-v1.1'
@@ -44,7 +59,62 @@ MAIN_MENU = ['1)  List site content',
 SETTINGS_MENU = ['1) Change current site.',
                  '2) Change domain.']
 
+def publishWeb (site= "sumpurn-en",domain= "sumpurn.com",debug = True) :
+    f = open('googleTemplates.py', 'r')  # Past stored templates
 
+    sample = SitesManipulator(site, domain, debug=debug)
+
+    # Create the following to start the web page on google sites
+    _webpage = '''
+    <div>
+    <table cellspacing="0" class="sites-layout-name-one-column sites-layout-hbox">
+     <tbody>
+       <tr><td class="sites-layout-tile sites-tile-name-content-1">
+           </td>
+       </tr>
+     </tbody>
+    </table>
+    </div>
+    '''
+
+    webpage = BeautifulSoup(_webpage)
+    tdwebpage = webpage.div.table.tbody.tr.td
+
+    for count in range(10) :
+        _myTemplate = eval("Template" + str(count))
+        _myparam = eval("param"+str(count))
+        _newhtml = BeautifulSoup(_myTemplate)
+        ___template = Template(_newhtml.prettify()).safe_substitute(_myparam)
+
+        newheading = webpage.new_tag("h3")
+        newheading.append("Substituted Template:")
+        tdwebpage.append(newheading)
+        newtag = webpage.new_tag("div")
+        newtag.append(BeautifulSoup(___template))
+
+
+        #tdwebpage.append(newtag)
+        if count not in [2, 10]:
+            tdwebpage.append(newtag)
+
+
+    path = '/templates'
+
+    print 'Fetching page by its path: ' + path
+    uri = '%s?path=%s' % (sample.client.MakeContentFeedUri(), path)
+    feed = sample.client.GetContentFeed(uri=uri)
+    old_entry = feed.entry[0]
+    # Update the listpage's title, html content, and first column's name.
+    old_entry.title.text = 'Updated Title'
+    # old_entry.content.html = str(mypage)+webpage.prettify().encode("utf-8")
+    old_entry.content.html = webpage.encode("utf8")
+    # old_entry.data.column[0].name = 'Owner'
+
+    # You can also change the page's webspace page name on an update.
+    # old_entry.page_name = 'new-page-path'
+
+    updated_entry = sample.client.Update(old_entry)
+    print 'List page updated!'
 
 
 def runSample () :
@@ -53,7 +123,145 @@ def runSample () :
   debug = True
 
   sample = SitesManipulator(site, domain, debug=debug)
-  sample.Run()
+  sample.Run() # On return it has read a page and built the templates from the page
+
+  #parser.saveSite("siteTemplates.json")
+  mytemplates = sample.mytemplates
+  sub_mytemplates = sample.sub_mytemplates
+
+  f = open('googleTemplates.py', 'r')  # Past stored templates
+  _f = open('_googleTemplates.py', 'w') # Newly generated templates
+
+  #Create the following to start the web page on google sites
+  _webpage = '''
+  <div>
+  <table cellspacing="0" class="sites-layout-name-one-column sites-layout-hbox">
+   <tbody>
+     <tr><td class="sites-layout-tile sites-tile-name-content-1">
+         </td>
+     </tr>
+   </tbody>
+  </table>
+  </div>
+  '''
+
+  webpage = BeautifulSoup(_webpage)
+  tdwebpage = webpage.div.table.tbody.tr.td
+
+  _img = webpage.new_tag("img",src="https://www.google.co.jp/images/branding/googlelogo/2x/googlelogo_color_272x92dp.png")
+
+  tdwebpage.append(_img)
+
+  count = 0
+  for ii in sorted(mytemplates.keys()):
+    print(mytemplates[ii])
+    if count <= 15:
+        print("count=",count)
+
+        myhtml = str(mytemplates[ii]).replace("html:", "")  # for  BeautifulSoup
+        myparams = sample.mytemplatesParams[ii]
+        soup = BeautifulSoup(myhtml, 'html.parser')
+
+        _prettyHTML = soup.prettify()
+        prettyHTML = _prettyHTML.encode('utf8')
+
+        sub_myhtml = str(sub_mytemplates[ii]).replace("html:", "")  # for  BeautifulSoup
+        sub_soup = BeautifulSoup(sub_myhtml, 'html.parser')
+
+        _sub_prettyHTML = sub_soup.prettify()
+        sub_prettyHTML = _sub_prettyHTML.encode("utf-8")
+
+        _fmyparams=pprint.PrettyPrinter(indent=4,width=20).pformat(myparams)
+        _fmyhtml = pprint.PrettyPrinter(indent=4, width=20).pformat(myhtml)
+
+        _f.write("# This Python file uses the following encoding: utf-8\n")
+        _f.write("param"+str(count) + " = " + _fmyparams +"\n\n")
+        _f.write("_template" + str(count) + "= '''\n" + _fmyhtml + "\n'''\n\n")
+        _f.write("template"+str(count) + "= '''\n"+prettyHTML+"\n'''\n\n")
+        _f.write("Template" + str(count) + "= '''\n" + sub_prettyHTML + "\n'''\n\n")
+
+        if 2 > 1 :
+            _mytemplate = eval("template"+str(count))
+            _newtag = BeautifulSoup(_mytemplate)
+
+            _myTemplate = eval("Template" + str(count))
+            _newhtml = BeautifulSoup(_myTemplate)
+
+            newheading = webpage.new_tag("h3")
+            newheading.append("Params:")
+            tdwebpage.append(newheading)
+            newpre = webpage.new_tag("pre")
+            newpre.append(_fmyparams)
+            tdwebpage.append(newpre)
+
+            newheading = webpage.new_tag("h3")
+            newheading.append("Template:")
+            tdwebpage.append(newheading)
+            newpre = webpage.new_tag("pre")
+            newpre.append(prettyHTML)
+            tdwebpage.append(newpre)
+
+            newheading = webpage.new_tag("h3")
+            newheading.append("Substituted Template:")
+            tdwebpage.append(newheading)
+            newpre = webpage.new_tag("pre")
+            newpre.append(sub_prettyHTML)
+            tdwebpage.append(newpre)
+
+
+            tdwebpage.append(_newtag) # Add the html code for the template
+
+            newheading = webpage.new_tag("h3")
+            newheading.append("Substituted Template-2:")
+            tdwebpage.append(newheading)
+            newpre = webpage.new_tag("pre")
+            ___template = Template(_newhtml.prettify()).safe_substitute(myparams)
+            newpre.append(___template)
+            tdwebpage.append(newpre)
+
+            #tdwebpage.append(BeautifulSoup(___template))
+
+            newheading = webpage.new_tag("h3")
+            newheading.append("Substituted Template-2 for html:")
+            tdwebpage.append(newheading)
+            newpre = webpage.new_tag("div")
+            newpre.append(BeautifulSoup(___template))
+        if count not in [2,10]:
+            tdwebpage.append(newpre)
+
+            #tdwebpage.append(___template)
+        else :
+            _newtag = webpage.new_tag("h3")
+            _newtag.append("SKIPPED " + str(count))
+            tdwebpage.append(_newtag)
+    else :
+        print("Skipped Count",count)
+
+    count += 1
+
+  f.close()
+  _f.close()
+
+  path = '/mytemplates2'
+
+
+
+  print 'Fetching page by its path: ' + path
+  uri = '%s?path=%s' % (sample.client.MakeContentFeedUri(), path)
+  feed = sample.client.GetContentFeed(uri=uri)
+  old_entry = feed.entry[0]
+  # Update the listpage's title, html content, and first column's name.
+  old_entry.title.text = 'Updated Title'
+  #old_entry.content.html = str(mypage)+webpage.prettify().encode("utf-8")
+  old_entry.content.html = str(webpage)
+  #old_entry.data.column[0].name = 'Owner'
+
+  # You can also change the page's webspace page name on an update.
+  # old_entry.page_name = 'new-page-path'
+
+  updated_entry = sample.client.Update(old_entry)
+  print 'List page updated!'
+
 
 
 #==========================================================================
@@ -62,6 +270,10 @@ class SitesManipulator(object):
   """Wrapper around the Sites API functionality."""
 
   def __init__(self, site_name=None, site_domain=None, debug=False):
+    self.mytemplates = {}
+    self.sub_mytemplates =  {}
+    self.mytemplatesParams = {}
+
     if site_domain is None:
       site_domain = self.PromptDomain()
 
@@ -150,13 +362,50 @@ class SitesManipulator(object):
     print
     return choice
 
+  def extractParameters(self,html,htmlname,params):
+      # type: (object, object, object) -> object
+    _myattributes ={}
+    _params = {}
+    if (len(html)>0):
+        for _html in html :
+          if _html.name :
+            _htmlname = str(_html.name.replace("html:",""))
+            __htmlname = (htmlname+"_"+_htmlname).replace("-","_")
+            _myattributes = _html.attrs
+
+            for attr in _myattributes :
+                _varname = str("$"+__htmlname+"_"+str(attr)).replace("-","_")
+                _params[_varname[1:]] = ''.join(_myattributes[attr]) #Remove $ start for dictioanary
+                _html[attr] = _varname
+
+            if _html.children :
+                _params.update(self.extractParameters(_html.contents,__htmlname,{} ))
+            else :
+                _html.string
+        params.update(_params)
+    return params
+
+
+
   def PrintEntry(self, entry):
     print '%s [%s]' % (entry.title.text, entry.Kind())
     if entry.page_name:
       print ' page name:\t%s' % entry.page_name.text
     if entry.content:
-      print ' content\t%s...' % str(entry.content.html)
-      parser.feed(entry.content.html)
+      mysoup = BeautifulSoup(str(entry.content.html), 'html.parser')
+
+      if entry.page_name.text == "home" :
+        for heading in mysoup.find_all("html:h2") :
+          myname = re.sub(r'.*::T::-|.*TOC-',"",heading.contents[0].attrs["name"])
+
+          mytemplates = ""
+          mytemplates = heading.nextSibling
+          self.mytemplates[myname] = mytemplates
+          sub_mytemplates=mytemplates.__copy__()  #Make a copy of the template
+          self.sub_mytemplates[myname] = sub_mytemplates
+          self.mytemplatesParams[myname] = self.extractParameters(sub_mytemplates,myname,{})
+
+
 
   def PrintListItem(self, entry):
     print '%s [%s]' % (entry.title.text, entry.Kind())
@@ -499,7 +748,6 @@ def showSiteContents():
     #for entry in feed.entry:
     #    print '%s [%s]' % (entry.title.text, entry.Kind())
 
-    import re
     import inspect
 
     for entry in listOfSites.entry:
@@ -533,15 +781,130 @@ def showSiteContents():
 from HTMLParser import HTMLParser
 from htmlentitydefs import name2codepoint
 
+import json
+
 class MyHTMLParser(HTMLParser):
+
+    def __init__ (self) :
+        self.reset()  # HTML  Parser calls this
+        self.resetVariables()
+        self.nlines = None # No. of lines in rawdata.
+        # Can be computed only after rawdata is set by feed
+        self.linesMap = None # Indices where the rawdata has line breaks
+        self.latestName = None
+        self.htmlTemplates = {}     #Discovered templates will be stored here
+
+    def saveSite(self,filename):
+        output = open(filename, 'wb')
+
+        # Pickle dictionary using protocol 0.
+        json.dump(self.htmlTemplates, output)
+        output.close()
+
+    def setLineMap(self):
+        self.nlines = self.rawdata.count("\n")
+        self.linesMap = {}
+        self.linesMap[0] = 0    # line 0 Starts from position 0
+        for lineno in range(self.nlines):
+            startpos = self.linesMap[lineno]
+            self.linesMap[lineno+1]=self.linesMap[lineno]+\
+                                    self.rawdata.find("\n",startpos+1)
+
+
+
+    def resetVariables (self) :
+        self.startedH2 = False
+        self.endedH2 = False
+        self.template = ""
+        self.startedTemplate = False
+    #    self.endedTemplate = False
+        self.templateStart = None
+        self.templateEnd = None
+        self.templateName = None
+
+
+    def printVariables(self):
+        print ("PRINTING VARIABLES")
+        print("startedH2=",self.startedH2,
+        "endedH2=",self.endedH2,
+              "i=",self.i,
+              "j=",self.j,
+              "ij_text=",self.rawdata[self.i:self.j+1],
+              "lineno=",self.lineno,
+              "nlines=",self.nlines,
+              "pos=",self.getpos(),
+              "template=",self.template,
+              "startedTemplate=",self.startedTemplate,
+              #"endedTemplate=",self.endedTemplate,
+              "templateStart=",self.templateStart,
+              "templateEnd=",self.templateEnd,
+              "templateName=",self.templateName)
+        print("linesMap = ",self.linesMap)
+        print("Tag text is = ", self.get_starttag_text())
+
+
+    def getTemplate(self) :
+        html = self.rawdata
+        print("Lines map for  =", self.templateName, " is : " , self.linesMap)
+        print("Template start = ",self.templateStarti,self.templateStart)
+        print("Template end = ", self.templateEndi,self.templateEnd)
+        #print("i,j= ",i,j)
+        #start = self.linesMap[self.templateStart[0]-1]+self.templateStart[1]
+        #end = self.linesMap[self.templateEnd[0]-1]+self.templateEnd[1]
+        start = self.templateStarti
+        end = self.templateEndi
+        self.htmlTemplates[self.templateName] = html[start:end]
+        print('Found template  :', self.templateName," ::: ",html[start:end])
+
+    def printTemplate(self):
+        html = self.rawdata
+        templateStart = self.getpos()
+        #start = self.linesMap[templateStart[0] - 1] + templateStart[1]
+        #end = self.linesMap[self.templateEnd[0] - 1] + self.templateEnd[1]
+        print('Template starting to end :', html[self.templateStarti:])
+
+
     def handle_starttag(self, tag, attrs):
-        print "Start tag:", tag
+        if not self.nlines : self.setLineMap()
+        print "Start tag:", tag, self.getpos()
+        self.printVariables()
+
+
         for attr in attrs:
             print "     attr:", attr
-    def handle_endtag(self, tag):
+            if attr[0] == 'name' : self.latestName = attr[1]
+
+        if not self.startedTemplate and self.endedH2 and not self.startedTemplate:
+            self.templateStart = self.getpos()  # Template has started
+            self.templateStarti = self.i  # Template has started
+            self.printTemplate()
+            self.startedTemplate = True
+
+        if tag == 'html:h2':
+
+            if self.templateStart:
+                self.templateEnd = self.getpos()
+                self.templateEndi = self.i
+                #self.printTemplate()
+                self.getTemplate()  # Read the discovered tempalate
+                self.resetVariables() # Fresh template block started
+            self.startedH2 = True
+
+    def handle_endtag(
+            self, tag):
         print "End tag  :", tag
+        #self.printTemplate()
+        if tag == 'html:h2':
+            self.endedH2 = True
+            self.templateName = self.latestName # Got the template name
+
+
+
+
     def handle_data(self, data):
         print "Data     :", data
+        #self.latestData = data
+
     def handle_comment(self, data):
         print "Comment  :", data
     def handle_entityref(self, name):
@@ -559,5 +922,7 @@ class MyHTMLParser(HTMLParser):
 parser = MyHTMLParser()
 
 if __name__ == '__main__':
-    runSample()
-    #showSiteContents()
+    #runSample()
+    publishWeb()
+    1
+    #showSiteContents()aq
